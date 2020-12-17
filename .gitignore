@@ -1,0 +1,11 @@
+config.ini
+certs
+venv
+.mypy_cache/
+*.pyc
+__pycache__
+.vscode/
+.idea/
+venv/
+config.py
+karton.ini

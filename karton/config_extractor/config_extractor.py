@@ -2,11 +2,11 @@
 import gc
 import hashlib
 import json
-import logging
 import os
 import re
 
 from karton.core import Config, Karton, Resource, Task
+from karton.core.resource import ResourceBase
 from malduck.extractor import ExtractManager, ExtractorModules
 
 from .__version__ import __version__
@@ -17,12 +17,12 @@ class AnalysisExtractManager(ExtractManager):
     Patched version of original ExtractManager, providing current karton interface
     """
 
-    def __init__(self, karton: Karton) -> None:
+    def __init__(self, karton: "ConfigExtractor") -> None:
         super(AnalysisExtractManager, self).__init__(karton.modules)
         self.karton = karton
 
 
-def create_extractor(karton) -> AnalysisExtractManager:
+def create_extractor(karton: "ConfigExtractor") -> AnalysisExtractManager:
     return AnalysisExtractManager(karton)
 
 
@@ -120,9 +120,9 @@ class ConfigExtractor(Karton):
         self.send_task(task)
 
     # analyze a standard, non-dump sample
-    def analyze_sample(self, sample: Resource) -> None:
+    def analyze_sample(self, sample: ResourceBase) -> None:
         extractor = create_extractor(self)
-        with sample.download_temporary_file() as temp:
+        with sample.download_temporary_file() as temp:  # type: ignore
             extractor.push_file(temp.name)
         configs = extractor.config
 
@@ -198,7 +198,7 @@ class ConfigExtractor(Karton):
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 
-    def process(self, task: Task) -> None:
+    def process(self, task: Task) -> None:  # type: ignore
         sample = task.get_resource("sample")
         headers = task.headers
 
@@ -212,7 +212,7 @@ class ConfigExtractor(Karton):
                 self.log.info("Analysis is too large, aborting")
                 return
 
-            with analysis.extract_temporary() as fpath:
+            with analysis.extract_temporary() as fpath:  # type: ignore
                 with open(os.path.join(fpath, "sample.txt"), "r") as f:
                     sample_hash = f.read()
 
@@ -222,11 +222,12 @@ class ConfigExtractor(Karton):
                 self.analyze_drakrun(sample, fpath)
         elif headers["type"] == "analysis" and headers["kind"] == "drakrun":
             # DRAKVUF Sandbox (codename: drakmon OSS)
-            sample_hash = hashlib.sha256(sample.content).hexdigest()
-            self.log.info("Processing drakmon OSS analysis, sample: {}"
-                          .format(sample_hash))
+            sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
+            self.log.info(
+                "Processing drakmon OSS analysis, sample: {}".format(sample_hash)
+            )
             dumps = task.get_resource("dumps.zip")
-            with dumps.extract_temporary() as tmpdir:
+            with dumps.extract_temporary() as tmpdir:  # type: ignore
                 self.analyze_drakrun(sample, tmpdir)
 
         self.log.debug("Printing gc stats")

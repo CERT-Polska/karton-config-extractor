@@ -5,8 +5,6 @@ import json
 import logging
 import os
 import re
-import tempfile
-import zipfile
 
 from karton.core import Config, Karton, Resource, Task
 from malduck.extractor import ExtractManager, ExtractorModules
@@ -30,7 +28,7 @@ def create_extractor(karton) -> AnalysisExtractManager:
 
 class ConfigExtractor(Karton):
     """
-    Extracts configuration from samples and Drakmon analyses
+    Extracts configuration from samples and Drakvuf Sandbox analyses
     """
 
     identity = "karton.config-extractor"
@@ -81,9 +79,6 @@ class ConfigExtractor(Karton):
     def __init__(self, config: Config, modules: str) -> None:
         super().__init__(config)
         self.modules = ExtractorModules(modules)
-
-    def _setup_logging(self) -> None:
-        logging.getLogger("malduck.extractor").addHandler(self.log_handler)
 
     def report_config(self, config, sample, parent=None):
         legacy_config = dict(config)
@@ -212,11 +207,8 @@ class ConfigExtractor(Karton):
             self.analyze_sample(sample)
         elif headers["type"] == "analysis" and headers["kind"] == "drakrun-prod":
             analysis = task.get_resource("analysis")
-            # replace with analysis.get_size(self.minio) once !8 is live
-            if (
-                self.minio.stat_object(analysis.bucket, analysis.uid).size
-                > 1024 * 1024 * 128
-            ):
+            if analysis.size > 1024 * 1024 * 128:
+
                 self.log.info("Analysis is too large, aborting")
                 return
 
@@ -231,18 +223,10 @@ class ConfigExtractor(Karton):
         elif headers["type"] == "analysis" and headers["kind"] == "drakrun":
             # DRAKVUF Sandbox (codename: drakmon OSS)
             sample_hash = hashlib.sha256(sample.content).hexdigest()
-            self.log.info(
-                "Processing drakmon OSS analysis, sample: {}".format(sample_hash)
-            )
-            # HACK: We can't use extract_temporary because 'dumps.zip' is pushed as
-            # regular resource, not DirectoryResource.
-            with tempfile.TemporaryDirectory() as tmpdir:
-                dumpsf = os.path.join(tmpdir, "dumps.zip")
-                task.get_resource("dumps.zip").download_to_file(dumpsf)
-
-                zipf = zipfile.ZipFile(dumpsf)
-                zipf.extractall(tmpdir)
-
+            self.log.info("Processing drakmon OSS analysis, sample: {}"
+                          .format(sample_hash))
+            dumps = task.get_resource("dumps.zip")
+            with dumps.extract_temporary() as tmpdir:
                 self.analyze_drakrun(sample, tmpdir)
 
         self.log.debug("Printing gc stats")

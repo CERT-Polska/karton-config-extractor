@@ -1,2 +1,2 @@
-karton.core==4.0.0-dev2
+karton.core==4.0.4
 malduck==4.0.1

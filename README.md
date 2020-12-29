@@ -2,8 +2,9 @@
 
 Extracts static configuration from samples and memory dumps using the malduck engine.
 
-Author: CERT.pl
-Maintainers: nazywam, psrok1, msm
+**Author**: CERT.pl
+
+**Maintainers**: nazywam, psrok1, msm
 
 **Consumes:**
 ```
@@ -61,3 +62,18 @@ Maintainers: nazywam, psrok1, msm
     }
 }
 ```
+
+
+## Usage
+
+First of all, make sure you have setup the core system: https://github.com/CERT-Polska/karton
+
+Then install karton-config-extractor from PyPi:
+
+```shell
+$ pip install karton-config-extractor
+
+$ karton-config-extractor --modules malduck-extractor-modules/
+```
+
+![Co-financed by the Connecting Europe Facility by of the European Union](https://www.cert.pl/wp-content/uploads/2019/02/en_horizontal_cef_logo-1.png)

@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./karton ./karton
 COPY ./setup.py ./setup.py
 RUN pip install .
-CMD karton-config-extractor
+ENTRYPOINT karton-config-extractor

@@ -156,9 +156,7 @@ class ConfigExtractor(Karton):
         analysis_dumps = sorted(os.listdir(dumps_path))
         for i, dump in enumerate(analysis_dumps):
             results["analysed"] += 1
-            self.log.debug(
-                "Analyzing dump %d/%d %s", i, len(analysis_dumps), str(dump)
-            )
+            self.log.debug("Analyzing dump %d/%d %s", i, len(analysis_dumps), str(dump))
             dump_path = os.path.join(dumps_path, dump)
 
             with open(dump_path, "rb") as f:
@@ -207,8 +205,8 @@ class ConfigExtractor(Karton):
 
     def get_base_from_drakrun_dump(self, dump_name):
         """
-        Drakrun dumps come in form: <base>_<hash> e.g. 405000_688f58c58d798ecb, 
-        that can be read as a dump from address 0x405000 with a content hash 
+        Drakrun dumps come in form: <base>_<hash> e.g. 405000_688f58c58d798ecb,
+        that can be read as a dump from address 0x405000 with a content hash
         equal to 688f58c58d798ecb.
         """
         return int(dump.split("_")[0], 16)
@@ -248,7 +246,7 @@ class ConfigExtractor(Karton):
             dumps.download_to_file(dumpsf)
             zipf = zipfile.ZipFile(dumpsf)
             dumps_path = tmpdir + "/dumps"
-            zipf.extractall(dumps_path, pwd=b'infected')
+            zipf.extractall(dumps_path, pwd=b"infected")
             self.analyze_dumps(sample, dumps_path, self.get_base_from_joesandbox_dump)
 
     def process(self, task: Task) -> None:  # type: ignore

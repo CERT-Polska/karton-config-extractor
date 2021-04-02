@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import re
+import tempfile
+import zipfile
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -55,6 +57,7 @@ class ConfigExtractor(Karton):
         },
         {"type": "analysis", "kind": "drakrun-prod"},
         {"type": "analysis", "kind": "drakrun"},
+        {"type": "analysis", "kind": "joesandbox"},
     ]
 
     @classmethod
@@ -133,10 +136,16 @@ class ConfigExtractor(Karton):
         else:
             self.log.info("Failed to get config")
 
-    # analyze a drakrun analysis
-    def analyze_drakrun(self, sample, path):
+    def analyze_dumps(self, sample, dumps_path, base_from_fname):
+        """
+        Analyse multiple dumps from given sample. There can be more than one
+        dump from which we managed to extract config from – try to find the best
+        candidate for each family. Dumps from different sources (e.g. drakrun/sandbox)
+        might follow diffent naming convention and that's why we require `base_from_fname`
+        function as argument that given a dump file name will extract the address
+        from which the dump has been taken.
+        """
         extractor = create_extractor(self)
-        dumps_path = os.path.join(path, "dumps")
         dump_candidates = {}
 
         results = {
@@ -146,33 +155,31 @@ class ConfigExtractor(Karton):
 
         analysis_dumps = sorted(os.listdir(dumps_path))
         for i, dump in enumerate(analysis_dumps):
-            # catch only dumps
-            if re.match(r"^[a-f0-9]{4,16}_[a-f0-9]{16}$", dump):
-                results["analysed"] += 1
-                self.log.debug(
-                    "Analyzing dump %d/%d %s", i, len(analysis_dumps), str(dump)
-                )
-                dump_path = os.path.join(dumps_path, dump)
+            results["analysed"] += 1
+            self.log.debug(
+                "Analyzing dump %d/%d %s", i, len(analysis_dumps), str(dump)
+            )
+            dump_path = os.path.join(dumps_path, dump)
 
-                with open(dump_path, "rb") as f:
-                    dump_data = f.read()
+            with open(dump_path, "rb") as f:
+                dump_data = f.read()
 
-                if not dump_data:
-                    self.log.warning("Dump {} is empty".format(dump))
-                    continue
+            if not dump_data:
+                self.log.warning("Dump {} is empty".format(dump))
+                continue
 
-                base = int(dump.split("_")[0], 16)
+            base = base_from_fname(dump)
 
-                try:
-                    family = extractor.push_file(dump_path, base=base)
-                    if family:
-                        self.log.info("Found better %s config in %s", family, dump)
-                        dump_candidates[family] = (dump, dump_data)
-                except Exception:
-                    self.log.exception("Error while extracting from {}".format(dump))
-                    results["crashed"] += 1
+            try:
+                family = extractor.push_file(dump_path, base=base)
+                if family:
+                    self.log.info("Found better %s config in %s", family, dump)
+                    dump_candidates[family] = (dump, dump_data)
+            except Exception:
+                self.log.exception("Error while extracting from {}".format(dump))
+                results["crashed"] += 1
 
-                self.log.debug("Finished analysing dump no. %d", i)
+            self.log.debug("Finished analysing dump no. %d", i)
 
         self.log.info("Merging and reporting extracted configs")
         for family, config in extractor.configs.items():
@@ -198,6 +205,52 @@ class ConfigExtractor(Karton):
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 
+    def get_base_from_drakrun_dump(self, dump_name):
+        """
+        Drakrun dumps come in form: <base>_<hash> e.g. 405000_688f58c58d798ecb, 
+        that can be read as a dump from address 0x405000 with a content hash 
+        equal to 688f58c58d798ecb.
+        """
+        return int(dump.split("_")[0], 16)
+
+    def analyze_drakrun(self, sample, dumps):
+        with dumps.extract_temporary() as tmpdir:  # type: ignore
+            dumps_path = os.path.join(path, "dumps")
+            # Drakrun stores meta information in seperate file for each dump.
+            # Filter it as we want to analyse only dumps.
+            for fname in os.listdir(dumps_path):
+                if not re.match(r"^[a-f0-9]{4,16}_[a-f0-9]{16}$", fname):
+                    full_path = os.path.join(dumps_path, fname)
+                    os.remove(tmpdir + fname)
+            self.analyze_dumps(sample, dumps_path, self.get_base_from_drakrun_dump)
+
+    def get_base_from_joesandbox_dump(self, dump_name):
+        """
+        JoeSandbox dumps come in three formats:
+        1) raw dumps with .sdmp extension, e.g.
+            00000002.00000003.385533966.003C0000.00000004.00000001.sdmp
+        2) dumps that start with 0x4d5a bytes
+            2.1) unmodified with .raw.unpack extension, e.g.
+                0.0.tmpi0shwswy.exe.1290000.0.raw.unpack
+            2.2) modified by joesandbox engine with .unpack extension, e.g.
+                0.0.tmpi0shwswy.exe.1290000.0.unpack
+        """
+        if "sdmp" in dump_name:
+            return int(dump_name.split(".")[3], 16)
+        elif "raw.unpack" in dump_name:
+            return int(dump_name.split(".")[4], 16)
+        elif "unpack" in dump_name:
+            return int(dump_name.split(".")[4], 16)
+
+    def analyze_joesandbox(self, sample, dumps):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dumpsf = os.path.join(tmpdir, "dumps.zip")
+            dumps.download_to_file(dumpsf)
+            zipf = zipfile.ZipFile(dumpsf)
+            dumps_path = tmpdir + "/dumps"
+            zipf.extractall(dumps_path, pwd=b'infected')
+            self.analyze_dumps(sample, dumps_path, self.get_base_from_joesandbox_dump)
+
     def process(self, task: Task) -> None:  # type: ignore
         sample = task.get_resource("sample")
         headers = task.headers
@@ -205,21 +258,6 @@ class ConfigExtractor(Karton):
         if headers["type"] == "sample":
             self.log.info("Analyzing original binary")
             self.analyze_sample(sample)
-        elif headers["type"] == "analysis" and headers["kind"] == "drakrun-prod":
-            analysis = task.get_resource("analysis")
-            if analysis.size > 1024 * 1024 * 128:
-
-                self.log.info("Analysis is too large, aborting")
-                return
-
-            with analysis.extract_temporary() as fpath:  # type: ignore
-                with open(os.path.join(fpath, "sample.txt"), "r") as f:
-                    sample_hash = f.read()
-
-                self.log.info(
-                    "Processing drakmon analysis, sample: {}".format(sample_hash)
-                )
-                self.analyze_drakrun(sample, fpath)
         elif headers["type"] == "analysis" and headers["kind"] == "drakrun":
             # DRAKVUF Sandbox (codename: drakmon OSS)
             sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
@@ -227,8 +265,12 @@ class ConfigExtractor(Karton):
                 "Processing drakmon OSS analysis, sample: {}".format(sample_hash)
             )
             dumps = task.get_resource("dumps.zip")
-            with dumps.extract_temporary() as tmpdir:  # type: ignore
-                self.analyze_drakrun(sample, tmpdir)
+            self.analyze_drakrun(sample, dumps)
+        elif headers["type"] == "analysis" and headers["kind"] == "joesandbox":
+            sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
+            self.log.info(f"Processing joesandbox analysis, sample: {sample_hash}")
+            dumps = task.get_resource("dumps.zip")
+            self.analyze_joesandbox(sample, dumps)
 
         self.log.debug("Printing gc stats")
         self.log.debug(gc.get_stats())

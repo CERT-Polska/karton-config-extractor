@@ -6,12 +6,15 @@ import os
 import re
 import tempfile
 import zipfile
+from collections import namedtuple
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
 from malduck.extractor import ExtractManager, ExtractorModules
 
 from .__version__ import __version__
+
+DumpInfo = namedtuple("DumpInfo", ("path", "base"))
 
 
 class AnalysisExtractManager(ExtractManager):
@@ -55,7 +58,6 @@ class ConfigExtractor(Karton):
             "kind": "runnable",
             "platform": "linux",
         },
-        {"type": "analysis", "kind": "drakrun-prod"},
         {"type": "analysis", "kind": "drakrun"},
         {"type": "analysis", "kind": "joesandbox"},
     ]
@@ -136,14 +138,11 @@ class ConfigExtractor(Karton):
         else:
             self.log.info("Failed to get config")
 
-    def analyze_dumps(self, sample, dumps_path, base_from_fname):
+    def analyze_dumps(self, sample, dump_infos):
         """
         Analyse multiple dumps from given sample. There can be more than one
         dump from which we managed to extract config from – try to find the best
-        candidate for each family. Dumps from different sources (e.g. drakrun/sandbox)
-        might follow diffent naming convention and that's why we require `base_from_fname`
-        function as argument that given a dump file name will extract the address
-        from which the dump has been taken.
+        candidate for each family.
         """
         extractor = create_extractor(self)
         dump_candidates = {}
@@ -153,37 +152,38 @@ class ConfigExtractor(Karton):
             "crashed": 0,
         }
 
-        analysis_dumps = sorted(os.listdir(dumps_path))
-        for i, dump in enumerate(analysis_dumps):
+        for i, dump_info in enumerate(dump_infos):
+            dump_basename = os.path.basename(dump_info.path)
             results["analysed"] += 1
-            self.log.debug("Analyzing dump %d/%d %s", i, len(analysis_dumps), str(dump))
-            dump_path = os.path.join(dumps_path, dump)
+            self.log.debug(
+                "Analyzing dump %d/%d %s", i, len(dump_infos), str(dump_basename)
+            )
 
-            with open(dump_path, "rb") as f:
+            with open(dump_info.path, "rb") as f:
                 dump_data = f.read()
 
             if not dump_data:
-                self.log.warning("Dump {} is empty".format(dump))
+                self.log.warning("Dump {} is empty".format(dump_basename))
                 continue
 
-            base = base_from_fname(dump)
-
             try:
-                family = extractor.push_file(dump_path, base=base)
+                family = extractor.push_file(dump_info.path, base=dump_info.base)
                 if family:
-                    self.log.info("Found better %s config in %s", family, dump)
-                    dump_candidates[family] = (dump, dump_data)
+                    self.log.info("Found better %s config in %s", family, dump_basename)
+                    dump_candidates[family] = (dump_basename, dump_data)
             except Exception:
-                self.log.exception("Error while extracting from {}".format(dump))
+                self.log.exception(
+                    "Error while extracting from {}".format(dump_basename)
+                )
                 results["crashed"] += 1
 
             self.log.debug("Finished analysing dump no. %d", i)
 
         self.log.info("Merging and reporting extracted configs")
         for family, config in extractor.configs.items():
-            dump, dump_data = dump_candidates[family]
-            self.log.info("* (%s) %s => %s", family, dump, json.dumps(config))
-            parent = Resource(name=dump, content=dump_data)
+            dump_basename, dump_data = dump_candidates[family]
+            self.log.info("* (%s) %s => %s", family, dump_basename, json.dumps(config))
+            parent = Resource(name=dump_basename, content=dump_data)
             task = Task(
                 {
                     "type": "sample",
@@ -214,13 +214,16 @@ class ConfigExtractor(Karton):
     def analyze_drakrun(self, sample, dumps):
         with dumps.extract_temporary() as tmpdir:  # type: ignore
             dumps_path = os.path.join(path, "dumps")
-            # Drakrun stores meta information in seperate file for each dump.
-            # Filter it as we want to analyse only dumps.
+            dump_infos = []
             for fname in os.listdir(dumps_path):
+                # Drakrun stores meta information in seperate file for each dump.
+                # Filter it as we want to analyse only dumps.
                 if not re.match(r"^[a-f0-9]{4,16}_[a-f0-9]{16}$", fname):
-                    full_path = os.path.join(dumps_path, fname)
-                    os.remove(tmpdir + fname)
-            self.analyze_dumps(sample, dumps_path, self.get_base_from_drakrun_dump)
+                    continue
+                dump_path = os.path.join(dumps_path, fname)
+                dump_base = self.get_base_from_drakrun_dump(fname)
+                dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
+            self.analyze_dumps(sample, dump_infos)
 
     def get_base_from_joesandbox_dump(self, dump_name):
         """
@@ -247,7 +250,12 @@ class ConfigExtractor(Karton):
             zipf = zipfile.ZipFile(dumpsf)
             dumps_path = tmpdir + "/dumps"
             zipf.extractall(dumps_path, pwd=b"infected")
-            self.analyze_dumps(sample, dumps_path, self.get_base_from_joesandbox_dump)
+            dump_infos = []
+            for fname in os.listdir(dumps_path):
+                dump_path = os.path.join(dumps_path, fname)
+                dump_base = self.get_base_from_joesandbox_dump(fname)
+                dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
+            self.analyze_dumps(sample, dump_infos)
 
     def process(self, task: Task) -> None:  # type: ignore
         sample = task.get_resource("sample")

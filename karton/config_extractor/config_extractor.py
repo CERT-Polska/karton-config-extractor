@@ -209,11 +209,11 @@ class ConfigExtractor(Karton):
         that can be read as a dump from address 0x405000 with a content hash
         equal to 688f58c58d798ecb.
         """
-        return int(dump.split("_")[0], 16)
+        return int(dump_name.split("_")[0], 16)
 
     def analyze_drakrun(self, sample, dumps):
         with dumps.extract_temporary() as tmpdir:  # type: ignore
-            dumps_path = os.path.join(path, "dumps")
+            dumps_path = os.path.join(tmpdir, "dumps")
             dump_infos = []
             for fname in os.listdir(dumps_path):
                 # Drakrun stores meta information in seperate file for each dump.

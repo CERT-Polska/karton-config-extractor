@@ -28,11 +28,11 @@ Extracts static configuration from samples and memory dumps using the malduck en
 },
 {
     "type": "analysis",
-    "kind": "drakrun-prod"
+    "kind": "drakrun"
 },
 {
     "type": "analysis",
-    "kind": "drakrun"
+    "kind": "joesandbox"
 }
 ```
 

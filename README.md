@@ -28,13 +28,10 @@ Extracts static configuration from samples and memory dumps using the malduck en
 },
 {
     "type": "analysis",
-    "kind": "drakrun"
 },
-{
-    "type": "analysis",
-    "kind": "joesandbox"
-}
 ```
+
+For the analysis type, the extractor tries to retrieve config from each memory dump passed in `dumps.zip` resource, but will pick only the best candidate from each family.
 
 **Produces:**
 ```

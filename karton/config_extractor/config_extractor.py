@@ -58,8 +58,7 @@ class ConfigExtractor(Karton):
             "kind": "runnable",
             "platform": "linux",
         },
-        {"type": "analysis", "kind": "drakrun"},
-        {"type": "analysis", "kind": "joesandbox"},
+        {"type": "analysis"}
     ]
 
     @classmethod
@@ -203,46 +202,6 @@ class ConfigExtractor(Karton):
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 
-    def get_base_from_drakrun_dump(self, dump_name):
-        """
-        Drakrun dumps come in form: <base>_<hash> e.g. 405000_688f58c58d798ecb,
-        that can be read as a dump from address 0x405000 with a content hash
-        equal to 688f58c58d798ecb.
-        """
-        return int(dump_name.split("_")[0], 16)
-
-    def analyze_drakrun(self, sample, dumps):
-        with dumps.extract_temporary() as tmpdir:  # type: ignore
-            dumps_path = os.path.join(tmpdir, "dumps")
-            dump_infos = []
-            for fname in os.listdir(dumps_path):
-                # Drakrun stores meta information in seperate file for each dump.
-                # Filter it as we want to analyse only dumps.
-                if not re.match(r"^[a-f0-9]{4,16}_[a-f0-9]{16}$", fname):
-                    continue
-                dump_path = os.path.join(dumps_path, fname)
-                dump_base = self.get_base_from_drakrun_dump(fname)
-                dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
-            self.analyze_dumps(sample, dump_infos)
-
-    def get_base_from_joesandbox_dump(self, dump_name):
-        """
-        JoeSandbox dumps come in three formats:
-        1) raw dumps with .sdmp extension, e.g.
-            00000002.00000003.385533966.003C0000.00000004.00000001.sdmp
-        2) dumps that start with 0x4d5a bytes
-            2.1) unmodified with .raw.unpack extension, e.g.
-                0.0.tmpi0shwswy.exe.1290000.0.raw.unpack
-            2.2) modified by joesandbox engine with .unpack extension, e.g.
-                0.0.tmpi0shwswy.exe.1290000.0.unpack
-        """
-        if "sdmp" in dump_name:
-            return int(dump_name.split(".")[3], 16)
-        elif "raw.unpack" in dump_name:
-            return int(dump_name.split(".")[4], 16)
-        elif "unpack" in dump_name:
-            return int(dump_name.split(".")[4], 16)
-
     def analyze_joesandbox(self, sample, dumps):
         with tempfile.TemporaryDirectory() as tmpdir:
             dumpsf = os.path.join(tmpdir, "dumps.zip")
@@ -264,19 +223,18 @@ class ConfigExtractor(Karton):
         if headers["type"] == "sample":
             self.log.info("Analyzing original binary")
             self.analyze_sample(sample)
-        elif headers["type"] == "analysis" and headers["kind"] == "drakrun":
-            # DRAKVUF Sandbox (codename: drakmon OSS)
+        elif headers["type"] == "analysis":
             sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
-            self.log.info(
-                "Processing drakmon OSS analysis, sample: {}".format(sample_hash)
-            )
+            self.log.info(f"Processing analysis, sample: {sample_hash}")
             dumps = task.get_resource("dumps.zip")
-            self.analyze_drakrun(sample, dumps)
-        elif headers["type"] == "analysis" and headers["kind"] == "joesandbox":
-            sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
-            self.log.info(f"Processing joesandbox analysis, sample: {sample_hash}")
-            dumps = task.get_resource("dumps.zip")
-            self.analyze_joesandbox(sample, dumps)
+            dumps_metadata = task.get_payload("dumps_metadata")
+            with dumps.extract_temporary() as tmpdir:  # type: ignore
+                dump_infos = []
+                for dump_metadata in dumps_metadata:
+                    dump_path = os.path.join(tmpdir, dump_metadata["filename"])
+                    dump_base = dump_metadata["base_address"]
+                    dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
+                self.analyze_dumps(dumps, dump_infos)
 
         self.log.debug("Printing gc stats")
         self.log.debug(gc.get_stats())

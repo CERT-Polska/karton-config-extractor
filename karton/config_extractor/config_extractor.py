@@ -202,20 +202,6 @@ class ConfigExtractor(Karton):
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 
-    def analyze_joesandbox(self, sample, dumps):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dumpsf = os.path.join(tmpdir, "dumps.zip")
-            dumps.download_to_file(dumpsf)
-            zipf = zipfile.ZipFile(dumpsf)
-            dumps_path = tmpdir + "/dumps"
-            zipf.extractall(dumps_path, pwd=b"infected")
-            dump_infos = []
-            for fname in os.listdir(dumps_path):
-                dump_path = os.path.join(dumps_path, fname)
-                dump_base = self.get_base_from_joesandbox_dump(fname)
-                dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
-            self.analyze_dumps(sample, dump_infos)
-
     def process(self, task: Task) -> None:  # type: ignore
         sample = task.get_resource("sample")
         headers = task.headers
@@ -234,7 +220,7 @@ class ConfigExtractor(Karton):
                     dump_path = os.path.join(tmpdir, dump_metadata["filename"])
                     dump_base = dump_metadata["base_address"]
                     dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
-                self.analyze_dumps(dumps, dump_infos)
+                self.analyze_dumps(sample, dump_infos)
 
         self.log.debug("Printing gc stats")
         self.log.debug(gc.get_stats())

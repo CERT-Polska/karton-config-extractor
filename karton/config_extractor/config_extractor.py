@@ -3,9 +3,6 @@ import gc
 import hashlib
 import json
 import os
-import re
-import tempfile
-import zipfile
 from collections import namedtuple
 
 from karton.core import Config, Karton, Resource, Task
@@ -58,7 +55,7 @@ class ConfigExtractor(Karton):
             "kind": "runnable",
             "platform": "linux",
         },
-        {"type": "analysis"}
+        {"type": "analysis"},
     ]
 
     @classmethod

@@ -18,8 +18,8 @@ setup(
     packages=["karton.config_extractor"],
     install_requires=open("requirements.txt").read().splitlines(),
     entry_points={
-        'console_scripts': [
-            'karton-config-extractor=karton.config_extractor:ConfigExtractor.main'
+        "console_scripts": [
+            "karton-config-extractor=karton.config_extractor:ConfigExtractor.main"
         ],
     },
     classifiers=[

@@ -100,7 +100,7 @@ class ConfigExtractor(Karton):
             config,
             modules=args.modules,
             result_tags=args.tag,
-            attributes=dict(attributes),
+            result_attributes=dict(attributes),
         )
         service.loop()
 

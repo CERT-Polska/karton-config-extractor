@@ -6,8 +6,8 @@ import os
 import re
 import tempfile
 import zipfile
-from collections import namedtuple, defaultdict
-from typing import List, Dict, DefaultDict
+from collections import defaultdict, namedtuple
+from typing import DefaultDict, Dict, List
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase

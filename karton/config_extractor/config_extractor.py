@@ -109,7 +109,7 @@ class ConfigExtractor(Karton):
         config: Config,
         modules: str,
         result_tags: List[str],
-        attributes: Dict[str, List[str]],
+        result_attributes: Dict[str, List[str]],
     ) -> None:
         """
         Create instance of the ConfigExtractor.

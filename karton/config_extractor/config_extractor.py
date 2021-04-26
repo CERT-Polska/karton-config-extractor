@@ -6,8 +6,8 @@ import os
 import re
 import tempfile
 import zipfile
-from collections import namedtuple
-from typing import List, Dict
+from collections import namedtuple, defaultdict
+from typing import List, Dict, DefaultDict
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -90,16 +90,17 @@ class ConfigExtractor(Karton):
         parser = cls.args_parser()
         args = parser.parse_args()
 
-        attributes = {}
+        attributes: DefaultDict[str, List[str]] = defaultdict(list)
         for attr in args.attribute:
             key, value = attr.split("=")
-            if key not in attributes:
-                attributes[key] = []
             attributes[key].append(value)
 
         config = Config(args.config_file)
         service = ConfigExtractor(
-            config, modules=args.modules, tags=args.tag, attributes=attributes
+            config,
+            modules=args.modules,
+            result_tags=args.tag,
+            attributes=dict(attributes),
         )
         service.loop()
 
@@ -107,7 +108,7 @@ class ConfigExtractor(Karton):
         self,
         config: Config,
         modules: str,
-        tags: List[str],
+        result_tags: List[str],
         attributes: Dict[str, List[str]],
     ) -> None:
         """
@@ -115,12 +116,12 @@ class ConfigExtractor(Karton):
 
         :param config: Karton configuration object
         :param modules: Path to a directory with malduck modules.
-        :param tags: Tags that should be applied to all produced configs.
+        :param result_tags: Tags that should be applied to all produced configs.
         :param attributes: Attributes that should be applied to all produced configs.
         """
         super().__init__(config)
         self.modules = ExtractorModules(modules)
-        self.tags = tags
+        self.result_tags = result_tags
         self.attributes = attributes
 
     def report_config(self, config, sample, parent=None):
@@ -158,7 +159,7 @@ class ConfigExtractor(Karton):
                 "config": legacy_config,
                 "sample": sample,
                 "parent": parent or sample,
-                "tags": self.tags,
+                "tags": self.result_tags,
                 "attributes": self.attributes,
             },
         )

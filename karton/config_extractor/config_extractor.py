@@ -116,13 +116,13 @@ class ConfigExtractor(Karton):
 
         :param config: Karton configuration object
         :param modules: Path to a directory with malduck modules.
-        :param result_tags: Tags that should be applied to all produced configs.
-        :param attributes: Attributes that should be applied to all produced configs.
+        :param result_tags: Tags to be applied to all produced configs.
+        :param result_attributes: Attributes to be applied to all produced configs.
         """
         super().__init__(config)
         self.modules = ExtractorModules(modules)
         self.result_tags = result_tags
-        self.attributes = attributes
+        self.result_attributes = result_attributes
 
     def report_config(self, config, sample, parent=None):
         legacy_config = dict(config)
@@ -160,7 +160,7 @@ class ConfigExtractor(Karton):
                 "sample": sample,
                 "parent": parent or sample,
                 "tags": self.result_tags,
-                "attributes": self.attributes,
+                "attributes": self.result_attributes,
             },
         )
         self.send_task(task)

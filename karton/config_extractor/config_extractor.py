@@ -92,7 +92,7 @@ class ConfigExtractor(Karton):
 
         attributes: DefaultDict[str, List[str]] = defaultdict(list)
         for attr in args.attribute:
-            key, value = attr.split("=")
+            key, value = attr.split("=", 1)
             attributes[key].append(value)
 
         config = Config(args.config_file)

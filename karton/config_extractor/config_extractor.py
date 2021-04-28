@@ -86,7 +86,6 @@ class ConfigExtractor(Karton):
         parser.add_argument(
             "--identity",
             help="Override the default karton identity",
-            default=None,
         )
         return parser
 

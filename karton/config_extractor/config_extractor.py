@@ -7,7 +7,7 @@ import re
 import tempfile
 import zipfile
 from collections import defaultdict, namedtuple
-from typing import DefaultDict, Dict, List
+from typing import DefaultDict, Dict, List, Optional
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -83,6 +83,10 @@ class ConfigExtractor(Karton):
             default=[],
             nargs="+",
         )
+        parser.add_argument(
+            "--identity",
+            help="Override the default Karton identity",
+        )
         return parser
 
     @classmethod
@@ -98,6 +102,7 @@ class ConfigExtractor(Karton):
         config = Config(args.config_file)
         service = ConfigExtractor(
             config,
+            identity=args.identity,
             modules=args.modules,
             result_tags=args.tag,
             result_attributes=dict(attributes),
@@ -107,6 +112,7 @@ class ConfigExtractor(Karton):
     def __init__(
         self,
         config: Config,
+        identity: Optional[str],
         modules: str,
         result_tags: List[str],
         result_attributes: Dict[str, List[str]],
@@ -115,11 +121,14 @@ class ConfigExtractor(Karton):
         Create instance of the ConfigExtractor.
 
         :param config: Karton configuration object
+        :param identity: Override the default Karton identity.
         :param modules: Path to a directory with malduck modules.
         :param result_tags: Tags to be applied to all produced configs.
         :param result_attributes: Attributes to be applied to all produced configs.
         """
         super().__init__(config)
+        if identity is not None:
+            self.identity = identity
         self.modules = ExtractorModules(modules)
         self.result_tags = result_tags
         self.result_attributes = result_attributes

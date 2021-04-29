@@ -126,9 +126,14 @@ class ConfigExtractor(Karton):
         :param result_tags: Tags to be applied to all produced configs.
         :param result_attributes: Attributes to be applied to all produced configs.
         """
-        super().__init__(config)
+
+        # Identity must be overriden before the super() call, because parent
+        # constructor uses implicit default identity (from the class field).
         if identity is not None:
             self.identity = identity
+
+        super().__init__(config)
+
         self.modules = ExtractorModules(modules)
         self.result_tags = result_tags
         self.result_attributes = result_attributes

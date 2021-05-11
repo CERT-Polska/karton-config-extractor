@@ -3,9 +3,6 @@ import gc
 import hashlib
 import json
 import os
-import re
-import tempfile
-import zipfile
 from collections import defaultdict, namedtuple
 from typing import DefaultDict, Dict, List, Optional
 

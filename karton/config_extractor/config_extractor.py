@@ -3,7 +3,11 @@ import gc
 import hashlib
 import json
 import os
-from collections import namedtuple
+import re
+import tempfile
+import zipfile
+from collections import defaultdict, namedtuple
+from typing import DefaultDict, Dict, List, Optional
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -66,6 +70,22 @@ class ConfigExtractor(Karton):
             help="Malduck extractor modules directory",
             default="extractor/modules",
         )
+        parser.add_argument(
+            "--tag",
+            help="Add specified tag to all produced configs",
+            default=[],
+            nargs="+",
+        )
+        parser.add_argument(
+            "--attribute",
+            help="Add specified attribute to all produced configs (format: key=value)",
+            default=[],
+            nargs="+",
+        )
+        parser.add_argument(
+            "--identity",
+            help="Override the default Karton identity",
+        )
         return parser
 
     @classmethod
@@ -73,13 +93,49 @@ class ConfigExtractor(Karton):
         parser = cls.args_parser()
         args = parser.parse_args()
 
+        attributes: DefaultDict[str, List[str]] = defaultdict(list)
+        for attr in args.attribute:
+            key, value = attr.split("=", 1)
+            attributes[key].append(value)
+
         config = Config(args.config_file)
-        service = ConfigExtractor(config, modules=args.modules)
+        service = ConfigExtractor(
+            config,
+            identity=args.identity,
+            modules=args.modules,
+            result_tags=args.tag,
+            result_attributes=dict(attributes),
+        )
         service.loop()
 
-    def __init__(self, config: Config, modules: str) -> None:
+    def __init__(
+        self,
+        config: Config,
+        identity: Optional[str],
+        modules: str,
+        result_tags: List[str],
+        result_attributes: Dict[str, List[str]],
+    ) -> None:
+        """
+        Create instance of the ConfigExtractor.
+
+        :param config: Karton configuration object
+        :param identity: Override the default Karton identity.
+        :param modules: Path to a directory with malduck modules.
+        :param result_tags: Tags to be applied to all produced configs.
+        :param result_attributes: Attributes to be applied to all produced configs.
+        """
+
+        # Identity must be overriden before the super() call, because parent
+        # constructor uses implicit default identity (from the class field).
+        if identity is not None:
+            self.identity = identity
+
         super().__init__(config)
+
         self.modules = ExtractorModules(modules)
+        self.result_tags = result_tags
+        self.result_attributes = result_attributes
 
     def report_config(self, config, sample, parent=None):
         legacy_config = dict(config)
@@ -116,6 +172,8 @@ class ConfigExtractor(Karton):
                 "config": legacy_config,
                 "sample": sample,
                 "parent": parent or sample,
+                "tags": self.result_tags,
+                "attributes": self.result_attributes,
             },
         )
         self.send_task(task)
@@ -215,7 +273,7 @@ class ConfigExtractor(Karton):
                 dump_infos = []
                 for dump_metadata in dumps_metadata:
                     dump_path = os.path.join(tmpdir, dump_metadata["filename"])
-                    dump_base = dump_metadata["base_address"]
+                    dump_base = int(dump_metadata["base_address"], 16)
                     dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
                 self.analyze_dumps(sample, dump_infos)
 

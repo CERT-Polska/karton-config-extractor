@@ -31,7 +31,31 @@ Extracts static configuration from samples and memory dumps using the malduck en
 },
 ```
 
-For the analysis type, the extractor tries to retrieve config from each memory dump passed in `dumps.zip` resource, but will pick only the best candidate from each family.
+While `sample` type is self explanatory, the `analysis` type might be confusing. The `analysis` task is an output from
+one of sandboxes: `drakvuf-sandbox`, `cuckoo`, or `joesandbox`. Analysis is a `sample` with additional memory dumps
+attached.
+
+The `analysis` type task is expected to be in format:
+```
+task = Task(
+    headers={"type": "analysis"}
+    payloads={
+        "dumps_metadata": [
+            {"filename": <dump1_filename>, "base_addr": <dump1_baseaddr>},
+            {"filename": <dump2_filename>, "base_addr": <dump2_baseaddr>},
+            {"filename": <dump3_filename>, "base_addr": <dump3_baseaddr>},
+            [...]],
+        },
+    resources={
+        "sample": <sample>
+        "dumps.zip": <packed memory dumps in zip format>
+    }
+)
+```
+where `dumps_metadata` contains information about filename and base address for every memory dump in `dumps.zip`.
+
+The extractor tries to retrieve config from each memory dump and will pick only the best candidate from each malware
+family.
 
 **Produces:**
 ```

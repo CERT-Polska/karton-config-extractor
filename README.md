@@ -39,7 +39,7 @@ The `analysis` type task is expected to be in format:
 ```
 task = Task(
     headers={"type": "analysis"}
-    payloads={
+    payload={
         "sample": <sample>,
         "dumps.zip": Resource.from_directory("dumps.zip", dumps_path.as_posix()),
         "dumps_metadata": [

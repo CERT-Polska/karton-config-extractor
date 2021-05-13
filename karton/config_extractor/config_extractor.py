@@ -284,4 +284,4 @@ class ConfigExtractor(Karton):
         """
         Check if path points to a file within basedir.
         """
-        return basedir == os.path.commonpath((basedir, os.path.abspath(path)))
+        return basedir == os.path.commonpath((basedir, os.path.realpath(path)))

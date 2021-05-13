@@ -270,9 +270,18 @@ class ConfigExtractor(Karton):
                 dump_infos = []
                 for dump_metadata in dumps_metadata:
                     dump_path = os.path.join(tmpdir, dump_metadata["filename"])
+                    if not self._is_safe_path(tmpdir, dump_path):
+                        self.log.warning(f"Path traversal attempt: {dump_path}")
+                        continue
                     dump_base = int(dump_metadata["base_address"], 16)
                     dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
                 self.analyze_dumps(sample, dump_infos)
 
         self.log.debug("Printing gc stats")
         self.log.debug(gc.get_stats())
+
+    def _is_safe_path(self, basedir, path):
+        """
+        Check if path points to a file within basedir.
+        """
+        return basedir == os.path.commonpath((basedir, os.path.abspath(path)))

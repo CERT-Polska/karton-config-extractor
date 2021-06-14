@@ -5,6 +5,7 @@ import json
 import os
 from collections import defaultdict, namedtuple
 from typing import DefaultDict, Dict, List, Optional
+from minio import Minio
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -68,6 +69,11 @@ class ConfigExtractor(Karton):
             default="extractor/modules",
         )
         parser.add_argument(
+            "--S3",
+            help="Set to True if your malduck modules are in your Karton S3 storage (MinIO)",
+            default=False,
+        )
+        parser.add_argument(
             "--tag",
             help="Add specified tag to all produced configs",
             default=[],
@@ -96,13 +102,39 @@ class ConfigExtractor(Karton):
             attributes[key].append(value)
 
         config = Config(args.config_file)
-        service = ConfigExtractor(
-            config,
-            identity=args.identity,
-            modules=args.modules,
-            result_tags=args.tag,
-            result_attributes=dict(attributes),
-        )
+
+        if args.S3:
+            # load all module files from a bucket
+            minio = Minio(
+                endpoint=os.environ['KARTON_MINIO_ADDRESS'],
+                access_key=os.environ['KARTON_MINIO_ACCESS_KEY'],
+                secret_key=os.environ['KARTON_MINIO_SECRET_KEY'],
+                secure=bool(int(os.environ['KARTON_MINIO_SECURE']))
+
+            )
+
+            # Recursively list all objects
+            objects = minio.list_objects(args.modules, recursive=True)
+
+            # Download all files to /tmp
+            for obj in objects:
+                minio.fget_object(args.modules, obj.object_name, os.path.join("/tmp/" + args.modules, obj.object_name))
+
+            service = ConfigExtractor(
+                config,
+                identity=args.identity,
+                modules="/tmp/" + args.modules,
+                result_tags=args.tag,
+                result_attributes=dict(attributes),
+            )
+        else:
+            service = ConfigExtractor(
+                config,
+                identity=args.identity,
+                modules=args.modules,
+                result_tags=args.tag,
+                result_attributes=dict(attributes),
+            )
         service.loop()
 
     def __init__(

@@ -99,5 +99,9 @@ $ pip install karton-config-extractor
 
 $ karton-config-extractor --modules malduck-extractor-modules/
 ```
+or if your malduck modules are in your Karton S3 storage (MinIO)
+```shell
+$ karton-config-extractor --modules malduck-extractor-modules --S3 True
+```
 
 ![Co-financed by the Connecting Europe Facility by of the European Union](https://www.cert.pl/wp-content/uploads/2019/02/en_horizontal_cef_logo-1.png)

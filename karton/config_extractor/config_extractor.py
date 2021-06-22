@@ -5,11 +5,11 @@ import json
 import os
 from collections import defaultdict, namedtuple
 from typing import DefaultDict, Dict, List, Optional
-from minio import Minio
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
 from malduck.extractor import ExtractManager, ExtractorModules
+from minio import Minio
 
 from .__version__ import __version__
 

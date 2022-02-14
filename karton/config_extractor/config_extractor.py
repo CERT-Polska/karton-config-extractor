@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from collections import defaultdict, namedtuple
+from pathlib import Path
 from typing import DefaultDict, Dict, List, Optional
 
 from karton.core import Config, Karton, Resource, Task
@@ -210,8 +211,13 @@ class ConfigExtractor(Karton):
                 "Analyzing dump %d/%d %s", i, len(dump_infos), str(dump_basename)
             )
 
-            with open(dump_info.path, "rb") as f:
-                dump_data = f.read()
+            dump_path = Path(dump_info.path)
+
+            if not dump_path.exists():
+                self.log.warning("Dump {} doesn't exist".format(dump_basename))
+                continue
+
+            dump_data = dump_path.read_bytes()
 
             if not dump_data:
                 self.log.warning("Dump {} is empty".format(dump_basename))

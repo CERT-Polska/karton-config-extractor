@@ -5,14 +5,14 @@ import json
 import os
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from typing import DefaultDict, Dict, List, Optional, Any
-from .util import config_dhash
+from typing import Any, DefaultDict, Dict, List, Optional
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
 from malduck.extractor import ExtractManager, ExtractorModules
 
 from .__version__ import __version__
+from .util import config_dhash
 
 DumpInfo = namedtuple("DumpInfo", ("path", "base"))
 

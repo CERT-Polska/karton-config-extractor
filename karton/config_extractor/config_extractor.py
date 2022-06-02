@@ -5,7 +5,8 @@ import json
 import os
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from typing import DefaultDict, Dict, List, Optional
+from typing import DefaultDict, Dict, List, Optional, Any
+from .util import config_dhash
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -135,7 +136,12 @@ class ConfigExtractor(Karton):
         self.result_tags = result_tags
         self.result_attributes = result_attributes
 
-    def report_config(self, config, sample, parent=None):
+    def report_config(
+        self,
+        config: Dict[str, Any],
+        sample: ResourceBase,
+        parent: Optional[ResourceBase] = None,
+    ) -> None:
         legacy_config = dict(config)
         legacy_config["type"] = config["family"]
         del legacy_config["family"]
@@ -159,6 +165,7 @@ class ConfigExtractor(Karton):
             self.log.info("Final config is empty, not sending it to the reporter")
             return
 
+        dhash = config_dhash(legacy_config)
         task = Task(
             {
                 "type": "config",
@@ -169,6 +176,7 @@ class ConfigExtractor(Karton):
             payload={
                 "config": legacy_config,
                 "sample": sample,
+                "dhash": dhash,
                 "parent": parent or sample,
                 "tags": self.result_tags,
                 "attributes": self.result_attributes,

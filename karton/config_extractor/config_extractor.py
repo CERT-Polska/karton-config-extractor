@@ -201,7 +201,7 @@ class ConfigExtractor(Karton):
 
     def analyze_dumps(
         self, task: Task, sample: ResourceBase, dump_infos: List[DumpInfo]
-    ):
+    ) -> None:
         """
         Analyse multiple dumps from given sample. There can be more than one
         dump from which we managed to extract config from – try to find the best

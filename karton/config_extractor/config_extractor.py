@@ -5,13 +5,14 @@ import json
 import os
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from typing import DefaultDict, Dict, List, Optional
+from typing import Any, DefaultDict, Dict, List, Optional
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
 from malduck.extractor import ExtractManager, ExtractorModules
 
 from .__version__ import __version__
+from .util import config_dhash
 
 DumpInfo = namedtuple("DumpInfo", ("path", "base"))
 
@@ -135,7 +136,13 @@ class ConfigExtractor(Karton):
         self.result_tags = result_tags
         self.result_attributes = result_attributes
 
-    def report_config(self, config, sample, parent=None):
+    def report_config(
+        self,
+        task: Task,
+        config: Dict[str, Any],
+        sample: ResourceBase,
+        parent: Optional[ResourceBase] = None,
+    ) -> None:
         legacy_config = dict(config)
         legacy_config["type"] = config["family"]
         del legacy_config["family"]
@@ -159,16 +166,18 @@ class ConfigExtractor(Karton):
             self.log.info("Final config is empty, not sending it to the reporter")
             return
 
+        dhash = config_dhash(legacy_config)
         task = Task(
             {
                 "type": "config",
                 "kind": "static",
                 "family": config["family"],
-                "quality": self.current_task.headers.get("quality", "high"),
+                "quality": task.headers.get("quality", "high"),
             },
             payload={
                 "config": legacy_config,
                 "sample": sample,
+                "dhash": dhash,
                 "parent": parent or sample,
                 "tags": self.result_tags,
                 "attributes": self.result_attributes,
@@ -177,7 +186,7 @@ class ConfigExtractor(Karton):
         self.send_task(task)
 
     # analyze a standard, non-dump sample
-    def analyze_sample(self, sample: ResourceBase) -> None:
+    def analyze_sample(self, task: Task, sample: ResourceBase) -> None:
         extractor = create_extractor(self)
         with sample.download_temporary_file() as temp:  # type: ignore
             extractor.push_file(temp.name)
@@ -186,11 +195,13 @@ class ConfigExtractor(Karton):
         if configs:
             config = configs[0]
             self.log.info("Got config: {}".format(json.dumps(config)))
-            self.report_config(config, sample)
+            self.report_config(task, config, sample)
         else:
             self.log.info("Failed to get config")
 
-    def analyze_dumps(self, sample, dump_infos):
+    def analyze_dumps(
+        self, task: Task, sample: ResourceBase, dump_infos: List[DumpInfo]
+    ) -> None:
         """
         Analyse multiple dumps from given sample. There can be more than one
         dump from which we managed to extract config from – try to find the best
@@ -256,7 +267,7 @@ class ConfigExtractor(Karton):
                 },
             )
             self.send_task(task)
-            self.report_config(config, sample, parent=parent)
+            self.report_config(task, config, sample, parent=parent)
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 
@@ -266,7 +277,7 @@ class ConfigExtractor(Karton):
 
         if headers["type"] == "sample":
             self.log.info("Analyzing original binary")
-            self.analyze_sample(sample)
+            self.analyze_sample(task, sample)
         elif headers["type"] == "analysis":
             sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
             self.log.info(f"Processing analysis, sample: {sample_hash}")
@@ -281,7 +292,7 @@ class ConfigExtractor(Karton):
                         continue
                     dump_base = int(dump_metadata["base_address"], 16)
                     dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
-                self.analyze_dumps(sample, dump_infos)
+                self.analyze_dumps(task, sample, dump_infos)
 
         self.log.debug("Printing gc stats")
         self.log.debug(gc.get_stats())

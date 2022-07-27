@@ -258,7 +258,7 @@ class ConfigExtractor(Karton):
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 
-    def process(self, task: Task) -> None:  # type: ignore
+    def process(self, task: Task) -> None:
         sample = task.get_resource("sample")
         headers = task.headers
 

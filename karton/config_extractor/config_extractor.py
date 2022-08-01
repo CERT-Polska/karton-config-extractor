@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-import argparse
 import gc
 import hashlib
 import json
@@ -95,13 +94,13 @@ class ConfigExtractor(Karton):
             attributes[key].append(value)
 
         config = Config(args.config_file)
+        cls.config_from_args(config, args)
         service = ConfigExtractor(
             config,
             modules=args.modules,
             result_tags=args.tag,
             result_attributes=dict(attributes),
         )
-        service.config_from_args(config, args)
         service.loop()
 
     def __init__(

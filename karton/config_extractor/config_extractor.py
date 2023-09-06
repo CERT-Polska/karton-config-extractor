@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import argparse
 import gc
 import hashlib
 import json
@@ -84,45 +85,35 @@ class ConfigExtractor(Karton):
         return parser
 
     @classmethod
-    def main(cls):
-        parser = cls.args_parser()
-        args = parser.parse_args()
-
+    def config_from_args(cls, config: Config, args: argparse.Namespace) -> None:
+        super().config_from_args(config, args)
         attributes: DefaultDict[str, List[str]] = defaultdict(list)
         for attr in args.attribute:
             key, value = attr.split("=", 1)
             attributes[key].append(value)
-
-        config = Config(args.config_file)
-        cls.config_from_args(config, args)
-        service = ConfigExtractor(
-            config,
-            modules=args.modules,
-            result_tags=args.tag,
-            result_attributes=dict(attributes),
+        config.load_from_dict(
+            {
+                "config-extractor": {
+                    "modules": args.modules,
+                    "result_tags": args.tag,
+                    "result_attributes": attributes,
+                }
+            }
         )
-        service.loop()
 
-    def __init__(
-        self,
-        config: Config,
-        modules: str,
-        result_tags: List[str],
-        result_attributes: Dict[str, List[str]],
-    ) -> None:
+    def __init__(self, config: Config) -> None:
         """
         Create instance of the ConfigExtractor.
 
         :param config: Karton configuration object
-        :param modules: Path to a directory with malduck modules.
-        :param result_tags: Tags to be applied to all produced configs.
-        :param result_attributes: Attributes to be applied to all produced configs.
         """
         super().__init__(config)
 
-        self.modules = ExtractorModules(modules)
-        self.result_tags = result_tags
-        self.result_attributes = result_attributes
+        self.modules = ExtractorModules(config.get("config-extractor", "modules"))
+        self.result_tags = config.get("config-extractor", "result_tags", fallback=[])
+        self.result_attributes = config.get(
+            "config-extractor", "result_attributes", fallback={}
+        )
 
     def report_config(
         self,

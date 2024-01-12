@@ -170,7 +170,7 @@ class ConfigExtractor(Karton):
         else:
             self.send_sample_tag_task(sample, [f"ripped: {family}", family])
 
-    def send_sample_tag_task(self, sample: Resource, tags: List[str]) -> None:
+    def send_sample_tag_task(self, sample: ResourceBase, tags: List[str]) -> None:
         task = Task(
             {
                 "type": "sample",

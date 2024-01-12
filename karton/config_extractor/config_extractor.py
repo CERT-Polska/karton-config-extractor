@@ -146,11 +146,12 @@ class ConfigExtractor(Karton):
             return
 
         dhash = config_dhash(legacy_config)
+        family = config["family"]
         task = Task(
             {
                 "type": "config",
                 "kind": "static",
-                "family": config["family"],
+                "family": family,
                 "quality": task.headers.get("quality", "high"),
             },
             payload={
@@ -161,6 +162,24 @@ class ConfigExtractor(Karton):
                 "tags": self.result_tags,
                 "attributes": self.result_attributes,
             },
+        )
+        self.send_task(task)
+        if parent:
+            self.send_sample_tag_task(sample, [family])
+            self.send_sample_tag_task(parent, [f"ripped: {family}"])
+        else:
+            self.send_sample_tag_task(sample, [f"ripped: {family}", family])
+
+    def send_sample_tag_task(self, sample: Resource, tags: List[str]) -> None:
+        task = Task(
+            {
+                "type": "sample",
+                "stage": "analyzed",
+            },
+            payload={
+                "sample": sample,
+                "tags": tags,
+            }
         )
         self.send_task(task)
 

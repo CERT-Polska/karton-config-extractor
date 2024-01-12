@@ -179,7 +179,7 @@ class ConfigExtractor(Karton):
             payload={
                 "sample": sample,
                 "tags": tags,
-            }
+            },
         )
         self.send_task(task)
 

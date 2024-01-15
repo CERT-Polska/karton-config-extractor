@@ -59,6 +59,30 @@ class ConfigExtractor(Karton):
             "kind": "runnable",
             "platform": "linux",
         },
+        {
+            "type": "sample",
+            "stage": "recognized",
+            "kind": "runnable",
+            "platform": "freebsd",
+        },
+        {
+            "type": "sample",
+            "stage": "recognized",
+            "kind": "runnable",
+            "platform": "netbsd",
+        },
+        {
+            "type": "sample",
+            "stage": "recognized",
+            "kind": "runnable",
+            "platform": "openbsd",
+        },
+        {
+            "type": "sample",
+            "stage": "recognized",
+            "kind": "runnable",
+            "platform": "solaris",
+        },
         {"type": "analysis"},
     ]
 

@@ -180,7 +180,7 @@ class ConfigExtractor(Karton):
             },
             payload={
                 "config": legacy_config,
-                "sample": sample,
+                "executed_sample": sample,
                 "dhash": dhash,
                 "parent": parent or sample,
                 "tags": self.result_tags,
@@ -189,8 +189,8 @@ class ConfigExtractor(Karton):
         )
         self.send_task(task)
         if parent:
-            self.send_sample_tag_task(sample, [family])
-            self.send_sample_tag_task(parent, [f"ripped: {family}"])
+            self.send_sample_tag_task(parent, [family])
+            self.send_sample_tag_task(sample, [f"ripped: {family}"])
         else:
             self.send_sample_tag_task(sample, [f"ripped: {family}", family])
 

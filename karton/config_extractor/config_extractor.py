@@ -140,8 +140,8 @@ class ConfigExtractor(Karton):
         )
 
     def preprocess_config(
-        self, config: Dict[str, Any], parent: Any
-    ) -> Tuple[Dict[str, any], List[Task]]:
+        self, config: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], List[Task]]:
         legacy_config = dict(config)
         legacy_config["type"] = config["family"]
         del legacy_config["family"]

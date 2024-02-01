@@ -216,8 +216,8 @@ class ConfigExtractor(Karton):
             legacy_config, karton_tasks = self.preprocess_config(config)
 
             if len(legacy_config.items()) > 1:
-                self.log.info("Got config: {}".format(json.dumps(config)))
-                self.report_config(task, config, sample)
+                self.log.info("Got config: {}".format(json.dumps(legacy_config)))
+                self.report_config(task, legacy_config, sample)
 
             for child_task in karton_tasks:
                 child_task.payload["parent"] = sample
@@ -300,7 +300,7 @@ class ConfigExtractor(Karton):
                     },
                 )
                 self.send_task(task)
-                self.report_config(task, config, sample, parent=parent)
+                self.report_config(task, legacy_config, sample, parent=parent)
             else:
                 self.log.info("Final config is empty, not sending it to the reporter")
 

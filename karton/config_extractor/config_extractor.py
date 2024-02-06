@@ -169,7 +169,7 @@ class ConfigExtractor(Karton):
     ) -> None:
         dhash = config_dhash(config)
 
-        family = config["family"]
+        family = config["type"]
         task = Task(
             {
                 "type": "config",

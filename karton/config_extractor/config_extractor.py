@@ -216,7 +216,7 @@ class ConfigExtractor(Karton):
             legacy_config, karton_tasks = self.preprocess_config(config)
 
             if len(legacy_config) > 1:
-                self.log.info("Got config: %s", json.dumps(config))
+                self.log.info("Got config: %s", json.dumps(legacy_config))
                 self.report_config(task, legacy_config, sample)
 
             for child_task in karton_tasks:

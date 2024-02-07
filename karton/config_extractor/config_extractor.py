@@ -6,7 +6,7 @@ import json
 import os
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from typing import Any, DefaultDict, Dict, List, Optional
+from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 
 from karton.core import Config, Karton, Resource, Task
 from karton.core.resource import ResourceBase
@@ -139,16 +139,14 @@ class ConfigExtractor(Karton):
             "config-extractor", "result_attributes", fallback={}
         )
 
-    def report_config(
-        self,
-        task: Task,
-        config: Dict[str, Any],
-        sample: ResourceBase,
-        parent: Optional[ResourceBase] = None,
-    ) -> None:
+    def preprocess_config(
+        self, config: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], List[Task]]:
         legacy_config = dict(config)
         legacy_config["type"] = config["family"]
         del legacy_config["family"]
+
+        karton_tasks = []
 
         # This allows us to spawn karton tasks for special config handling
         if "store-in-karton" in legacy_config:
@@ -157,20 +155,21 @@ class ConfigExtractor(Karton):
             for karton_task in legacy_config["store-in-karton"]:
                 task_data = karton_task["task"]
                 payload_data = karton_task["payload"]
-                payload_data["parent"] = parent or sample
-
-                task = Task(headers=task_data, payload=payload_data)
-                self.send_task(task)
-                self.log.info("Sending ripped task %s", task.uid)
+                karton_tasks.append(Task(headers=task_data, payload=payload_data))
 
             del legacy_config["store-in-karton"]
+        return legacy_config, karton_tasks
 
-        if len(legacy_config.items()) == 1:
-            self.log.info("Final config is empty, not sending it to the reporter")
-            return
+    def report_config(
+        self,
+        task: Task,
+        config: Dict[str, Any],
+        sample: ResourceBase,
+        parent: Optional[ResourceBase] = None,
+    ) -> None:
+        dhash = config_dhash(config)
 
-        dhash = config_dhash(legacy_config)
-        family = config["family"]
+        family = config["type"]
         task = Task(
             {
                 "type": "config",
@@ -179,7 +178,7 @@ class ConfigExtractor(Karton):
                 "quality": task.headers.get("quality", "high"),
             },
             payload={
-                "config": legacy_config,
+                "config": config,
                 "executed_sample": sample,
                 "dhash": dhash,
                 "parent": parent or sample,
@@ -212,14 +211,20 @@ class ConfigExtractor(Karton):
         extractor = create_extractor(self)
         with sample.download_temporary_file() as temp:  # type: ignore
             extractor.push_file(temp.name)
-        configs = extractor.config
 
-        if configs:
-            config = configs[0]
-            self.log.info("Got config: {}".format(json.dumps(config)))
-            self.report_config(task, config, sample)
-        else:
-            self.log.info("Failed to get config")
+        for config in extractor.config:
+            legacy_config, karton_tasks = self.preprocess_config(config)
+
+            if len(legacy_config) > 1:
+                self.log.info("Got config: %s", json.dumps(legacy_config))
+                self.report_config(task, legacy_config, sample)
+
+            for child_task in karton_tasks:
+                child_task.payload["parent"] = sample
+                self.send_task(child_task)
+                self.log.info("Sending ripped task %s", task.uid)
+
+        self.log.info("Finished processing sample")
 
     def analyze_dumps(
         self, task: Task, sample: ResourceBase, dump_infos: List[DumpInfo]
@@ -273,23 +278,36 @@ class ConfigExtractor(Karton):
         for family, config in extractor.configs.items():
             dump_basename, dump_data = dump_candidates[family]
             self.log.info("* (%s) %s => %s", family, dump_basename, json.dumps(config))
-            parent = Resource(name=dump_basename, content=dump_data)
-            task = Task(
-                {
-                    "type": "sample",
-                    "stage": "analyzed",
-                    "kind": "dump",
-                    "platform": "win32",
-                    "extension": "exe",
-                },
-                payload={
-                    "sample": parent,
-                    "parent": sample,
-                    "tags": ["dump:win32:exe"],
-                },
-            )
-            self.send_task(task)
-            self.report_config(task, config, sample, parent=parent)
+
+            legacy_config, karton_tasks = self.preprocess_config(config)
+            karton_task_parent = sample
+
+            if len(legacy_config) > 1:
+                parent = Resource(name=dump_basename, content=dump_data)
+                karton_task_parent = parent
+                task = Task(
+                    {
+                        "type": "sample",
+                        "stage": "analyzed",
+                        "kind": "dump",
+                        "platform": "win32",
+                        "extension": "exe",
+                    },
+                    payload={
+                        "sample": parent,
+                        "parent": sample,
+                        "tags": ["dump:win32:exe"],
+                    },
+                )
+                self.send_task(task)
+                self.report_config(task, legacy_config, sample, parent=parent)
+            else:
+                self.log.info("Final config is empty, not sending it to the reporter")
+
+            for child_task in karton_tasks:
+                child_task.payload["parent"] = karton_task_parent
+                self.send_task(child_task)
+                self.log.info("Sending ripped task %s", task.uid)
 
         self.log.info("done analysing, results: {}".format(json.dumps(results)))
 

@@ -282,7 +282,7 @@ class ConfigExtractor(Karton):
             legacy_config, karton_tasks = self.preprocess_config(config)
             karton_task_parent = sample
 
-            if len(legacy_config.items()) > 1:
+            if len(legacy_config) > 1:
                 parent = Resource(name=dump_basename, content=dump_data)
                 karton_task_parent = parent
                 task = Task(

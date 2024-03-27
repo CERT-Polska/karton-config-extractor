@@ -1,2 +1,2 @@
-karton-core>=5.0.0,<6.0.0
+karton-core>=5.3.4,<6.0.0
 malduck>=4.3.2,<5.0.0

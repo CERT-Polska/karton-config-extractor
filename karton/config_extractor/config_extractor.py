@@ -316,7 +316,7 @@ class ConfigExtractor(Karton):
         headers = task.headers
 
         if headers["type"] == "sample":
-            self.log.info("Analyzing original binary")
+            self.log.info(f"Analyzing original binary: {sample.sha256}")
             self.analyze_sample(task, sample)
         elif headers["type"] == "analysis":
             sample_hash = hashlib.sha256(sample.content or b"").hexdigest()

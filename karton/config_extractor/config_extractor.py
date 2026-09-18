@@ -321,18 +321,24 @@ class ConfigExtractor(Karton):
         elif headers["type"] == "analysis":
             sample_hash = hashlib.sha256(sample.content or b"").hexdigest()
             self.log.info(f"Processing analysis, sample: {sample_hash}")
-            dumps = task.get_resource("dumps.zip")
-            dumps_metadata = task.get_payload("dumps_metadata")
-            with dumps.extract_temporary() as tmpdir:  # type: ignore
-                dump_infos = []
-                for dump_metadata in dumps_metadata:
-                    dump_path = os.path.join(tmpdir, dump_metadata["filename"])
-                    if not self._is_safe_path(tmpdir, dump_path):
-                        self.log.warning(f"Path traversal attempt: {dump_path}")
-                        continue
-                    dump_base = int(dump_metadata["base_address"], 16)
-                    dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
-                self.analyze_dumps(task, sample, dump_infos)
+            dumps = None
+            dumps_metadata = None
+            try:
+                dumps = task.get_resource("dumps.zip")
+                dumps_metadata = task.get_payload("dumps_metadata")
+            except TypeError:
+                self.log.warning("Analysis has no dumps or dumps_metadata resources")
+            if dumps and dumps_metadata:
+                with dumps.extract_temporary() as tmpdir:  # type: ignore
+                    dump_infos = []
+                    for dump_metadata in dumps_metadata:
+                        dump_path = os.path.join(tmpdir, dump_metadata["filename"])
+                        if not self._is_safe_path(tmpdir, dump_path):
+                            self.log.warning(f"Path traversal attempt: {dump_path}")
+                            continue
+                        dump_base = int(dump_metadata["base_address"], 16)
+                        dump_infos.append(DumpInfo(path=dump_path, base=dump_base))
+                    self.analyze_dumps(task, sample, dump_infos)
 
         self.log.debug("Printing gc stats")
         self.log.debug(gc.get_stats())

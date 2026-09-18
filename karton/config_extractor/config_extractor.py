@@ -327,7 +327,7 @@ class ConfigExtractor(Karton):
                 dumps = task.get_resource("dumps.zip")
                 dumps_metadata = task.get_payload("dumps_metadata")
             except TypeError:
-                self.log.info("Analysis has no dumps or dumps_metadata resources")
+                self.log.warning("Analysis has no dumps or dumps_metadata resources")
             if dumps and dumps_metadata:
                 with dumps.extract_temporary() as tmpdir:  # type: ignore
                     dump_infos = []

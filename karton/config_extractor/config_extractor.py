@@ -85,6 +85,10 @@ class ConfigExtractor(Karton):
         },
         {"type": "analysis"},
     ]
+    egress_filters = [
+        {"type": "config", "kind": "static"},
+        {"type": "sample", "stage": "analyzed"},
+    ]
 
     @classmethod
     def args_parser(cls):
